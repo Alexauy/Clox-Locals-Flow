@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include "compiler.h"
+#include "memory.h"
 #include "scanner.h"
 
 #ifdef DEBUG_PRINT_CODE
@@ -42,10 +43,11 @@ typedef struct {
 typedef struct {
   Token name;
   int depth;
+  bool isCaptured;
 } Local;
 
 typedef struct {
-  Local locals[UINT8_COUNT];
+  Local* locals;
   int localCount;
   int scopeDepth;
 } Compiler;
@@ -114,6 +116,10 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
   emitByte(byte1);
   emitByte(byte2);
 }
+static void emitShort(uint16_t value) {
+  emitByte((value >> 8) & 0xff);
+  emitByte(value & 0xff);
+}
 static void emitReturn() {
   emitByte(OP_RETURN);
 }
@@ -130,6 +136,7 @@ static void emitConstant(Value value) {
   emitBytes(OP_CONSTANT, makeConstant(value));
 }
 static void initCompiler(Compiler* compiler) {
+  compiler->locals = ALLOCATE(Local, LOCALS_MAX);
   compiler->localCount = 0;
   compiler->scopeDepth = 0;
   current = compiler;
@@ -141,6 +148,7 @@ static void endCompiler() {
     disassembleChunk(currentChunk(), "code");
   }
 #endif
+  FREE_ARRAY(Local, current->locals, LOCALS_MAX);
 }
 static void beginScope() {
   current->scopeDepth++;
@@ -184,7 +192,7 @@ static int resolveLocal(Compiler* compiler, Token* name) {
   return -1;
 }
 static void addLocal(Token name) {
-  if (current->localCount == UINT8_COUNT) {
+  if (current->localCount == LOCALS_MAX) {
     error("Too many local variables in function.");
     return;
   }
@@ -192,6 +200,7 @@ static void addLocal(Token name) {
   Local* local = &current->locals[current->localCount++];
   local->name = name;
   local->depth = -1;
+  local->isCaptured = false;
 }
 static void declareVariable() {
   if (current->scopeDepth == 0) return;
@@ -271,8 +280,10 @@ static void string(bool canAssign) {
 }
 static void namedVariable(Token name, bool canAssign) {
   uint8_t getOp, setOp;
-  int arg = resolveLocal(current, &name);
-  if (arg != -1) {
+  int local = resolveLocal(current, &name);
+  int arg;
+  if (local != -1) {
+    arg = local;
     getOp = OP_GET_LOCAL;
     setOp = OP_SET_LOCAL;
   } else {
@@ -283,9 +294,19 @@ static void namedVariable(Token name, bool canAssign) {
 
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
-    emitBytes(setOp, (uint8_t)arg);
+    if (local != -1) {
+      emitByte(setOp);
+      emitShort((uint16_t)arg);
+    } else {
+      emitBytes(setOp, (uint8_t)arg);
+    }
   } else {
-    emitBytes(getOp, (uint8_t)arg);
+    if (local != -1) {
+      emitByte(getOp);
+      emitShort((uint16_t)arg);
+    } else {
+      emitBytes(getOp, (uint8_t)arg);
+    }
   }
 }
 static void variable(bool canAssign) {

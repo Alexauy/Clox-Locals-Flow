@@ -9,6 +9,7 @@
 #define DEBUG_TRACE_EXECUTION
 
 #define UINT8_COUNT (UINT8_MAX + 1)
+#define LOCALS_MAX 65536
 
 #endif
 // In the book, we show them defined, but for working on them locally,
