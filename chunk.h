@@ -6,8 +6,6 @@
 
 typedef enum {
   OP_CONSTANT,
-  //ADDED FOR CHALLENGE 23.1 >
-  OP_DUP,
   OP_NIL,
   OP_TRUE,
   OP_FALSE,
@@ -20,10 +18,6 @@ typedef enum {
   OP_EQUAL,
   OP_GREATER,
   OP_LESS,
-  //ADDED FOR CHALLENGE 23.1 >
-  OP_JUMP_IF_FALSE,
-  OP_JUMP,
-  //ADDED FOR CHALLENGE 23.1 <
   OP_ADD,
   OP_SUBTRACT,
   OP_MULTIPLY,

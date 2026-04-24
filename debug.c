@@ -22,16 +22,6 @@ static int simpleInstruction(const char* name, int offset) {
   printf("%s\n", name);
   return offset + 1;
 }
-//ADDED FOR CHALLENGE 23.1 >
-static int jumpInstruction(const char* name, int sign, Chunk* chunk,
-            int offset) {
-  uint16_t jump = (uint16_t)(chunk->code[offset + 1] << 8);
-  jump |= (uint8_t)chunk->code[offset + 2];
-  printf("%-16s %4d -> %d\n", name, offset,
-    offset + 3 + sign * jump);
-  return offset + 3;
-}
-//ADDED FOR CHALLENGE 23.1 <
 static int byteInstruction(const char* name, Chunk* chunk,
                            int offset) {
   uint8_t slot = chunk->code[offset + 1];
@@ -59,10 +49,6 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_FALSE", offset);
     case OP_POP:
       return simpleInstruction("OP_POP", offset);
-    //ADDED FOR CHALLENGE 23.1 >
-    case OP_DUP:
-      return simpleInstruction("OP_DUP", offset);
-    //ADDED FOR CHALLENGE 23.1 <
     case OP_GET_LOCAL:
       return byteInstruction("OP_GET_LOCAL", chunk, offset);
     case OP_SET_LOCAL:
@@ -76,12 +62,6 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_SET_GLOBAL", chunk, offset);
     case OP_EQUAL:
       return simpleInstruction("OP_EQUAL", offset);
-    //ADDED FOR CHALLENGE 23.1 >
-    case OP_JUMP_IF_FALSE:
-      return jumpInstruction("OP_JUMP_IF_FALSE", 1, chunk, offset);
-    case OP_JUMP:
-      return jumpInstruction("OP_JUMP", 1, chunk, offset);
-    //ADDED FOR CHALLENGE 23.1 <
     case OP_GREATER:
       return simpleInstruction("OP_GREATER", offset);
     case OP_LESS:

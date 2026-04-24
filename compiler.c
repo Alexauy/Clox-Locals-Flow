@@ -156,25 +156,6 @@ static void endScope() {
   }
 }
 
-#define MAX_CASES 256
-
-static int emitJump(uint8_t instruction) {
-  emitByte(instruction);
-  emitByte(0xff);
-  emitByte(0xff);
-  return currentChunk()->count - 2;
-}
-
-static void patchJump(int offset) {
-  // Calculate the jump distance from the placeholder to current end.
-  int jump = currentChunk()->count - offset - 2;
-  if (jump > UINT16_MAX) {
-    error("Too much code to jump over.");
-  }
-  currentChunk()->code[offset] = (jump >> 8) & 0xff;
-  currentChunk()->code[offset + 1] = jump & 0xff;
-}
-
 static void expression();
 static void statement();
 static void declaration();
@@ -422,78 +403,6 @@ static void printStatement() {
   consume(TOKEN_SEMICOLON, "Expect ';' after value.");
   emitByte(OP_PRINT);
 }
-//ADDED FOR CHALLENGE 23.1 >
-static void switchStatement() {
-  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'switch'.");
-  expression();
-  consume(TOKEN_RIGHT_PAREN, "Expect ')' after value.");
-  consume(TOKEN_LEFT_BRACE, "Expect '{' before switch cases.");
-
-  int state = 0; // 0: before all cases, 1: before default, 2: after default.
-  int caseEnds[MAX_CASES];
-  int caseCount = 0;
-  int previousCaseSkip = -1;
-
-  while (!match(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
-    if (match(TOKEN_CASE) || match(TOKEN_DEFAULT)) {
-      TokenType caseType = parser.previous.type;
-
-      if (state == 2) {
-        error("Can't have another case or default after the default case.");
-      }
-
-      if (state == 1) {
-        // At the end of the previous case, jump over the others.
-        caseEnds[caseCount++] = emitJump(OP_JUMP);
-
-        // Patch its condition to jump to the next case (this one).
-        patchJump(previousCaseSkip);
-        emitByte(OP_POP);
-      }
-
-      if (caseType == TOKEN_CASE) {
-        state = 1;
-
-        // See if the case is equal to the value.
-        emitByte(OP_DUP);
-        expression();
-
-        consume(TOKEN_COLON, "Expect ':' after case value.");
-
-        emitByte(OP_EQUAL);
-        previousCaseSkip = emitJump(OP_JUMP_IF_FALSE);
-
-        // Pop the comparison result.
-        emitByte(OP_POP);
-      } else {
-        state = 2;
-        consume(TOKEN_COLON, "Expect ':' after default.");
-        previousCaseSkip = -1;
-      }
-    } else {
-      // Otherwise, it's a statement inside the current case.
-      if (state == 0) {
-        error("Can't have statements before any case.");
-      }
-      statement();
-    }
-  }
-
-  // If we ended without a default case, patch its condition jump.
-  if (state == 1) {
-    patchJump(previousCaseSkip);
-    emitByte(OP_POP);
-  }
-
-  // Patch all the case jumps to the end.
-  for (int i = 0; i < caseCount; i++) {
-    patchJump(caseEnds[i]);
-  }
-
-  emitByte(OP_POP); // The switch value.
-}
-//ADDED FOR CHALLENGE 23.1 <
-
 static void synchronize() {
   parser.panicMode = false;
 
@@ -529,8 +438,6 @@ static void declaration() {
 static void statement() {
   if (match(TOKEN_PRINT)) {
     printStatement();
-  } else if (match(TOKEN_SWITCH)) {  //ADDED FOR CHALLENGE 23.1 >
-    switchStatement();                    // <
   } else if (match(TOKEN_LEFT_BRACE)) {
     beginScope();
     block();
